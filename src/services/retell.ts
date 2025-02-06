@@ -1,109 +1,87 @@
-const RETELL_API_KEY = import.meta.env.VITE_RETELL_API_KEY;
+import { supabase } from '../lib/supabase';
 
-if (!RETELL_API_KEY) {
-  throw new Error('Missing RetellAI API key. Please add VITE_RETELL_API_KEY to your .env file.');
+interface AgentConfig {
+  agentName: string;
+  voiceId: string;
+  voiceModel: string;
+  voiceSpeed?: number;
+  language?: string;
 }
 
-export class RetellService {
+class RetellService {
   private static instance: RetellService;
-  private baseUrl = 'https://api.retell.ai';
+  
+  private defaultAgentConfig: AgentConfig = {
+    agentName: "AI Assistant",
+    voiceId: "11labs-Adrian",
+    voiceModel: "eleven_turbo_v2",
+    voiceSpeed: 1.0,
+    language: "en-US"
+  };
 
   private constructor() {}
 
-  static getInstance() {
+  static getInstance(): RetellService {
     if (!RetellService.instance) {
       RetellService.instance = new RetellService();
     }
     return RetellService.instance;
   }
 
-  private async request(endpoint: string, options: RequestInit = {}) {
+  private async validateSession() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error('Authentication required');
+    }
+    return session;
+  }
+
+  async createAgent(prompt: string, config?: Partial<AgentConfig>) {
+    if (!prompt) {
+      throw new Error('Prompt is required');
+    }
+
     try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        ...options,
+      const session = await this.validateSession();
+
+      // Log the request payload for debugging
+      const requestPayload = {
+        prompt,
+        ...this.defaultAgentConfig,
+        ...config,
+        normalize_for_speech: true,
+        enable_transcription_formatting: true
+      };
+      console.log('Creating agent with payload:', requestPayload);
+
+      const { data, error } = await supabase.functions.invoke('retell-agent', {
+        body: requestPayload,
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${RETELL_API_KEY}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          ...options.headers
+          Authorization: `Bearer ${session.access_token}`,
         }
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-        let error;
-        try {
-          const data = JSON.parse(text);
-          error = data.error || data.message || 'RetellAI API request failed';
-        } catch {
-          error = text || 'RetellAI API request failed';
-        }
-        throw new Error(error);
+      console.log('Response from edge function:', { data, error });
+
+      if (error) {
+        throw new Error(`Failed to create agent: ${error.message}`);
       }
 
-      const data = await response.json();
-      return data;
-    } catch (err) {
-      if (err instanceof Error) {
-        if (err.message.includes('Failed to fetch')) {
-          throw new Error('Unable to connect to RetellAI. Please check your internet connection.');
-        }
-        throw new Error(`RetellAI Error: ${err.message}`);
+      if (!data?.agentId || !data?.llmId) {
+        throw new Error('Failed to create agent - missing required data');
       }
-      throw new Error('An unexpected error occurred');
+
+      return {
+        agentId: data.agentId,
+        llmId: data.llmId,
+        config: requestPayload
+      };
+
+    } catch (error) {
+      console.error('RetellService.createAgent error:', error);
+      throw error;
     }
-  }
-
-  async createAgent(prompt: string) {
-    if (!prompt) {
-      throw new Error('Agent prompt is required');
-    }
-
-    return this.request('/create-agent', {
-      method: 'POST',
-      body: JSON.stringify({
-        response_engine: {
-          type: 'retell-llm',
-          llm_id: 'gpt-4',
-          prompt
-        },
-        voice_id: 'nova',
-        agent_name: 'Mortgage Assistant'
-      })
-    });
-  }
-
-  async createPhoneNumber(agentId: string) {
-    if (!agentId) {
-      throw new Error('Agent ID is required');
-    }
-
-    return this.request('/create-phone-number', {
-      method: 'POST',
-      body: JSON.stringify({
-        area_code: '415',
-        inbound_agent_id: agentId,
-        nickname: 'Mortgage Support Line'
-      })
-    });
-  }
-
-  async deleteAgent(agentId: string) {
-    if (!agentId) {
-      throw new Error('Agent ID is required');
-    }
-
-    return this.request(`/delete-agent/${agentId}`, {
-      method: 'DELETE'
-    });
-  }
-
-  async getAgent(agentId: string) {
-    if (!agentId) {
-      throw new Error('Agent ID is required');
-    }
-
-    return this.request(`/get-agent/${agentId}`);
   }
 }
 

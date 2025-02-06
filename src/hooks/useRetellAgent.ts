@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { retellService } from '../services/retell';
 import { useAgentConfig } from './useAgentConfig';
+import { supabase } from '../lib/supabase';
 
 interface RetellAgentConfig {
   status: 'inactive' | 'deploying' | 'active' | 'error';
@@ -37,35 +38,34 @@ export function useRetellAgent() {
         errorMessage: null
       }));
 
-      // Create agent
-      const { id: agentId } = await retellService.createAgent(prompt);
-
-      // Wait for agent to be ready
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Verify agent status
-      const agentStatus = await retellService.getAgent(agentId);
-      if (agentStatus.status !== 'active') {
-        throw new Error('Agent failed to initialize');
+      // Create agent with auth token
+      const result = await retellService.createAgent(prompt);
+      
+      if (!result.agentId) {
+        throw new Error('Failed to create agent - missing agent ID');
       }
-
-      // Create phone number
-      const { phone_number } = await retellService.createPhoneNumber(agentId);
 
       setConfig({
         status: 'active',
         errorMessage: null,
-        phoneNumber: phone_number,
-        agentId: agentId
+        phoneNumber: null, // We'll set this later if needed
+        agentId: result.agentId
       });
     } catch (err) {
       console.error('Error deploying RetellAI agent:', err);
+      const errorMessage = err instanceof Error
+        ? err.message
+        : 'Failed to deploy agent. Please try again.';
+      
       setConfig(prev => ({
         ...prev,
         status: 'error',
-        errorMessage: err instanceof Error ? err.message : 'Failed to deploy agent'
+        errorMessage,
+        phoneNumber: null,
+        agentId: null
       }));
-      throw err;
+      
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -13,6 +13,8 @@ export default function AgentPortal() {
       await deployAgent();
     } catch (error) {
       console.error('Failed to deploy agent:', error);
+      // Error state is already handled by useRetellAgent hook
+      // Additional UI feedback could be added here if needed
     }
   };
 
