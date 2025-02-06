@@ -1,4 +1,3 @@
-import React from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import AppContent from './components/AppContent';
 import AuthForms from './components/auth/AuthForms';

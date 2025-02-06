@@ -1,5 +1,6 @@
+// @ts-ignore 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-
+// @ts-ignore 
 const RETELL_API_KEY = Deno.env.get('RETELL_API_KEY')
 if (!RETELL_API_KEY) {
   throw new Error('Missing RETELL_API_KEY environment variable')

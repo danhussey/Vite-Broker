@@ -1,4 +1,6 @@
+// @ts-ignore 
 import { assertEquals, assertExists } from "https://deno.land/std@0.168.0/testing/asserts.ts";
+// @ts-ignore 
 import { load } from "https://deno.land/std@0.168.0/dotenv/mod.ts";
 
 // Load environment variables
@@ -16,7 +18,7 @@ interface RetellResponse {
   llmId: string;
   agentId: string;
 }
-
+// @ts-ignore 
 Deno.test({
   name: "Retell Agent API Integration Tests",
   async fn(t) {

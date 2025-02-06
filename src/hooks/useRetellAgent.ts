@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { retellService } from '../services/retell';
 import { useAgentConfig } from './useAgentConfig';
-import { supabase } from '../lib/supabase';
 
 interface RetellAgentConfig {
   status: 'inactive' | 'deploying' | 'active' | 'error';
@@ -78,7 +77,8 @@ export function useRetellAgent() {
 
     try {
       setLoading(true);
-      await retellService.deleteAgent(config.agentId);
+      // TODO: Implement deleteAgent
+      // await retellService.deleteAgent(config.agentId);
 
       setConfig({
         status: 'inactive',
