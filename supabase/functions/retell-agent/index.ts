@@ -8,7 +8,7 @@ if (!RETELL_API_KEY) {
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS'
 }
 
 async function makeRetellRequest(url: string, options: RequestInit) {
@@ -27,6 +27,12 @@ async function makeRetellRequest(url: string, options: RequestInit) {
       throw new Error(`RetellAI API error (${response.status}): ${errorText}`);
     }
 
+    // For DELETE requests, just return success status
+    if (options.method === 'DELETE') {
+      return { success: true };
+    }
+
+    // For other requests, parse JSON
     return await response.json();
   } catch (error) {
     console.error(`RetellAI request failed for ${url}:`, error);
@@ -88,6 +94,48 @@ serve(async (req) => {
           agentId: agentData.agent_id
         }),
         {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    if (req.method === 'DELETE') {
+      if (body.agentId) {
+        // Delete the agent
+        const deleteAgentResponse = await makeRetellRequest(`https://api.retellai.com/delete-agent/${body.agentId}`, {
+          method: 'DELETE'
+        });
+
+        console.log('Agent deleted:', deleteAgentResponse);
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Agent deleted successfully' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      if (body.llmId) {
+        // Delete the LLM
+        const deleteLlmResponse = await makeRetellRequest(`https://api.retellai.com/delete-retell-llm/${body.llmId}`, {
+          method: 'DELETE'
+        });
+
+        console.log('LLM deleted:', deleteLlmResponse);
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'LLM deleted successfully' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ error: 'Missing required field: agentId or llmId' }),
+        {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
