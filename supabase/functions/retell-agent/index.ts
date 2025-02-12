@@ -42,8 +42,84 @@ async function makeRetellRequest(url: string, options: RequestInit) {
 }
 
 serve(async (req) => {
+  console.log('Request URL:', req.url);
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  if (req.method === 'DELETE' && req.url.includes('/delete-phone/')) {
+    try {
+      // Extract phone number from URL
+      const phoneNumber = req.url.split('/delete-phone/')[1];
+      if (!phoneNumber) {
+        return new Response(
+          JSON.stringify({ error: 'Phone number is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('Deleting phone number:', phoneNumber);
+      await makeRetellRequest(`https://api.retellai.com/delete-phone-number/${phoneNumber}`, {
+        method: 'DELETE'
+      });
+
+      return new Response(
+        JSON.stringify({ message: `Phone number ${phoneNumber} deleted successfully` }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (error) {
+      console.error('Error deleting phone number:', error);
+      return new Response(
+        JSON.stringify({ error: `Error deleting phone number: ${error.message}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+
+  if (req.method === 'POST' && (req.url.endsWith('/create-phone') || req.url.endsWith('/retell-agent/create-phone'))) {
+    console.log('Handling create-phone request');
+    try {
+      const { area_code, inbound_agent_id, outbound_agent_id, nickname } = await req.json();
+      console.log('Request body:', { area_code, inbound_agent_id, outbound_agent_id, nickname });
+      
+      // Only validate area_code if it's provided
+      if (area_code !== undefined && (typeof area_code !== 'number' || area_code.toString().length !== 3)) {
+        return new Response(
+          JSON.stringify({ error: 'If area_code is provided, it must be a 3-digit number.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      try {
+        const phoneData = await makeRetellRequest('https://api.retellai.com/create-phone-number', {
+          method: 'POST',
+          body: JSON.stringify({
+            area_code,
+            inbound_agent_id,
+            outbound_agent_id,
+            nickname
+          })
+        });
+
+        console.log('Retell API response:', phoneData);
+        return new Response(
+          JSON.stringify(phoneData),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error('Retell API error:', error);
+        return new Response(
+          JSON.stringify({ error: `Error from Retell API: ${error.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } catch (error) {
+      console.error('Error processing request:', error);
+      return new Response(
+        JSON.stringify({ error: `Error processing request: ${error.message}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
   }
 
   try {
