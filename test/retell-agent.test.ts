@@ -18,7 +18,67 @@ interface RetellResponse {
   llmId: string;
   agentId: string;
 }
+
+interface PhoneNumberResponse {
+  phone_number: string;
+  phone_number_type: string;
+  phone_number_pretty: string;
+  nickname: string;
+  last_modification_timestamp: number;
+}
 // @ts-ignore 
+// Test phone number operations
+Deno.test({
+  name: "Create Phone Number",
+  async fn(t) {
+    await t.step("POST - Create Phone Number", async () => {
+      const response = await fetch(`${BASE_URL}/create-phone`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${ANON_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nickname: "Test Phone"
+        }),
+      });
+
+      console.log('Create Phone Response Status:', response.status);
+      const responseText = await response.text();
+      console.log('Create Phone Response Body:', responseText);
+
+      assertEquals(response.status, 200);
+      const data = JSON.parse(responseText) as PhoneNumberResponse;
+      assertExists(data.phone_number);
+      assertEquals(data.nickname, "Test Phone");
+      
+      // Store the phone number for the delete test
+      const phoneNumber = data.phone_number;
+      
+      // Add delay before deletion to ensure resource is fully created
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Delete the phone number
+      const deleteResponse = await fetch(`${BASE_URL}/delete-phone/${phoneNumber}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${ANON_KEY}`,
+        },
+      });
+      
+      console.log('Delete Phone Response Status:', deleteResponse.status);
+      const deleteResponseText = await deleteResponse.text();
+      console.log('Delete Phone Response Body:', deleteResponseText);
+      
+      assertEquals(deleteResponse.status, 200);
+      const deleteData = JSON.parse(deleteResponseText);
+      assertEquals(deleteData.message, `Phone number ${phoneNumber} deleted successfully`);
+    });
+  },
+  sanitizeOps: false,
+  sanitizeResources: false,
+});
+
 Deno.test({
   name: "Retell Agent API Integration Tests",
   async fn(t) {
